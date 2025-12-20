@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tài Xỉu Pro Demo (Rooms + Leaderboard + 3D Dice)</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#121a22;
+      --panel2:#0f151c;
+      --text:#e7edf5;
+      --muted:#9aa8b7;
+      --good:#38d27f;
+      --bad:#ff5a6a;
+      --accent:#7dd3fc;
+      --gold:#ffd36a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 800px at 50% 10%, #142232 0%, var(--bg) 55%, #070a0e 100%);
+      color:var(--text);
+    }
+    .wrap{max-width:1180px;margin:0 auto;padding:18px}
+    .topbar{
+      display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    .brand{
+      display:flex;align-items:center;gap:10px;
+      padding:10px 12px;border-radius:14px;background:linear-gradient(180deg, #121a22, #0c1117);
+      border:1px solid rgba(255,255,255,.06);
+      box-shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--good);box-shadow:0 0 18px rgba(56,210,127,.8)}
+    .brand b{letter-spacing:.3px}
+    .row{display:grid;grid-template-columns:1.35fr .65fr;gap:14px}
+    @media (max-width: 980px){ .row{grid-template-columns:1fr} }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:18px;
+      box-shadow:0 12px 40px rgba(0,0,0,.45);
+      overflow:hidden;
+    }
+    .card h3{margin:0;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);color:#dbe7f5;font-size:14px;letter-spacing:.2px}
+    .card .content{padding:14px}
+
+    .tableWrap{display:grid;grid-template-columns: 1.1fr .9fr;gap:14px;align-items:start}
+    @media (max-width: 860px){ .tableWrap{grid-template-columns:1fr} }
+
+    .table{
+      width:100%;
+      aspect-ratio: 1 / 1;
+      max-width:520px;
+      margin:0 auto;
+      border-radius:999px;
+      position:relative;
+      background:
+        radial-gradient(circle at 50% 40%, rgba(25,40,58,.95), rgba(10,15,20,.98) 58%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,.08), transparent 60%);
+      border:1px solid rgba(255,255,255,.08);
+      box-shadow: inset 0 0 0 10px rgba(0,0,0,.35), 0 18px 60px rgba(0,0,0,.55);
+      overflow:hidden;
+    }
+    .ledRing{
+      position:absolute; inset:10px;
+      border-radius:999px;
+      background: conic-gradient(from 0deg,
+        rgba(125,211,252,.0),
+        rgba(125,211,252,.9),
+        rgba(255,211,106,.9),
+        rgba(56,210,127,.9),
+        rgba(255,90,106,.9),
+        rgba(125,211,252,.9),
+        rgba(125,211,252,.0)
+      );
+      filter: blur(1px);
+      opacity:.9;
+      animation: spin 2.2s linear infinite;
+      mix-blend-mode: screen;
+      mask: radial-gradient(circle, transparent 56%, #000 60%);
+      pointer-events:none;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .tableInner{
+      position:absolute; inset:26px;
+      border-radius:999px;
+      background: radial-gradient(circle at 50% 35%, rgba(25,45,65,.9), rgba(9,12,16,.98) 70%);
+      border:1px solid rgba(255,255,255,.06);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:14px;
+      gap:12px;
+    }
+
+    .statusLine{
+      display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;
+      color:var(--muted);font-size:13px;
+      z-index:2;
+    }
+    .pill{
+      padding:6px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(0,0,0,.25);
+    }
+    .pill b{color:var(--text)}
+    .count{font-variant-numeric: tabular-nums;font-weight:700;color:var(--accent)}
+
+    /* 3D canvas */
+    #threeWrap{
+      width:100%;
+      height:210px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
+      z-index:1;
+    }
+    #threeCanvas{
+      width:100%;
+      height:100%;
+      border-radius:16px;
+      background:rgba(0,0,0,.10);
+      border:1px solid rgba(255,255,255,.06);
+    }
+    .fallback2d{
+      display:none;
+      gap:12px;align-items:center;justify-content:center;
+    }
+    .die2d{
+      width:66px;height:66px;border-radius:14px;
+      background: linear-gradient(180deg, #f3f6fb, #cfd7e6);
+      border:1px solid rgba(0,0,0,.15);
+      box-shadow: 0 10px 22px rgba(0,0,0,.35);
+      position:relative;
+    }
+    .pip{width:12px;height:12px;border-radius:999px;background:#111827;position:absolute;opacity:0}
+    .shake{animation: shake .18s linear infinite}
+    @keyframes shake{
+      0%{transform:translate(0,0) rotate(0deg)}
+      25%{transform:translate(3px,-2px) rotate(6deg)}
+      50%{transform:translate(-3px,2px) rotate(-6deg)}
+      75%{transform:translate(2px,3px) rotate(5deg)}
+      100%{transform:translate(0,0) rotate(0deg)}
+    }
+
+    .resultBig{
+      font-size:18px;font-weight:800;letter-spacing:.3px;text-align:center;
+      z-index:2;
+    }
+    .verify{font-size:12px;color:var(--muted);word-break: break-all;z-index:2}
+
+    .controls{display:flex;flex-direction:column;gap:10px}
+    .field{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    input, button{font:inherit}
+    input[type="text"], input[type="number"]{
+      padding:10px 12px;border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.25);
+      color:var(--text);
+      outline:none;
+    }
+    input[type="number"]{width:160px}
+    .btnRow{display:flex;gap:10px;flex-wrap:wrap}
+    button{
+      padding:10px 12px;border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      cursor:pointer;
+      transition: transform .05s ease, background .15s ease;
+    }
+    button:active{transform:translateY(1px)}
+    .btnTai{background:rgba(125,211,252,.12)}
+    .btnXiu{background:rgba(255,211,106,.12)}
+    .btnGhost{background:rgba(255,255,255,.04)}
+    .btnDanger{background:rgba(255,90,106,.12)}
+    .hint{color:var(--muted);font-size:12px;line-height:1.35}
+
+    .list{display:flex;flex-direction:column;gap:10px}
+    .mini{
+      padding:10px 12px;border-radius:14px;
+      background:rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .mini h4{margin:0 0 8px 0;font-size:13px;color:#d8e6f6}
+    .muted{color:var(--muted);font-size:12px}
+    .players{display:flex;flex-direction:column;gap:8px}
+    .playerRow{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);
+      font-variant-numeric: tabular-nums;
+    }
+    .tag{font-size:11px;color:var(--muted)}
+    .good{color:var(--good)}
+    .bad{color:var(--bad)}
+    .gold{color:var(--gold)}
+    .chatBox{
+      height:190px; overflow:auto; padding:10px; border-radius:14px;
+      background:rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.08);
+      font-size:13px;
+    }
+    .chatLine{margin:0 0 6px 0;color:#d9e6f5}
+    .chatLine .sys{color:var(--muted)}
+    .chatInput{display:flex;gap:10px;margin-top:10px}
+    .chatInput input{flex:1}
+    .kbd{font-size:11px;color:var(--muted)}
+    .leaderRow{
+      display:flex;justify-content:space-between;gap:10px;
+      padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div><b>Tài Xỉu Pro Demo</b> <span class="tag">(coin ảo • rooms • leaderboard • 3D dice)</span></div>
+          <div class="kbd">Hotkeys: <b>T</b>=Tài, <b>X</b>=Xỉu, <b>Enter</b>=chat</div>
+        </div>
+      </div>
+
+      <div class="brand" style="gap:14px">
+        <div>
+          <div class="tag">Phòng</div>
+          <input id="roomId" type="text" value="lobby" />
+        </div>
+        <div>
+          <div class="tag">Tên</div>
+          <input id="name" type="text" value="Player" />
+        </div>
+        <button id="btnJoin">Vào phòng</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <h3>Bàn chơi</h3>
+        <div class="content tableWrap">
+          <div class="table" aria-label="Bàn chơi">
+            <div class="ledRing"></div>
+            <div class="tableInner">
+              <div class="statusLine">
+                <span class="pill">Round: <b id="roundId">-</b></span>
+                <span class="pill">Trạng thái: <b id="state">-</b></span>
+                <span class="pill">Còn: <span class="count" id="countdown">--</span>s</span>
+              </div>
+
+              <div id="threeWrap">
+                <canvas id="threeCanvas"></canvas>
+                <div class="fallback2d" id="fallback2d">
+                  <div class="die2d" id="die1"></div>
+                  <div class="die2d" id="die2"></div>
+                  <div class="die2d" id="die3"></div>
+                </div>
+              </div>
+
+              <div class="resultBig" id="resultBig">Chưa có kết quả</div>
+              <div class="verify" id="verifyLine"></div>
+            </div>
+          </div>
+
+          <div class="controls">
+            <div class="mini">
+              <h4>Đặt cược</h4>
+              <div class="field">
+                <div>
+                  <div class="tag">Số dư</div>
+                  <div style="font-variant-numeric:tabular-nums;font-weight:800" id="balance">-</div>
+                </div>
+                <div>
+                  <div class="tag">Tiền cược</div>
+                  <input id="betAmount" type="number" min="1" value="100" />
+                </div>
+              </div>
+
+              <div class="btnRow" style="margin-top:10px">
+                <button class="btnTai" id="btnTai">ĐẶT TÀI</button>
+                <button class="btnXiu" id="btnXiu">ĐẶT XỈU</button>
+                <button class="btnGhost" id="btnClear">Xóa cược</button>
+                <button class="btnDanger" id="btnReset">Reset coin</button>
+              </div>
+
+              <div class="hint" style="margin-top:10px">
+                RNG do server tạo. “Nặn” ở đây chỉ là hiệu ứng lăn/đợi.
+              </div>
+            </div>
+
+            <div class="mini">
+              <h4>Dealer</h4>
+              <div class="muted" id="dealerLine">Chưa kết nối.</div>
+            </div>
+
+            <div class="mini">
+              <h4>Thống kê nhanh</h4>
+              <div class="muted" id="statsLine">-</div>
+            </div>
+
+            <div class="mini">
+              <h4>Lịch sử (20 ván)</h4>
+              <div class="muted" id="historyLine">-</div>
+            </div>
+
+            <div class="mini">
+              <h4>Leaderboard (Top 20)</h4>
+              <div class="muted" id="leaderLine">-</div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Phòng, Người chơi & Chat</h3>
+        <div class="content list">
+          <div class="mini">
+            <h4>Danh sách phòng</h4>
+            <div class="muted">Gợi ý: gõ tên phòng mới rồi bấm “Vào phòng”.</div>
+            <div class="btnRow" style="margin-top:10px">
+              <button class="btnGhost" id="btnRefreshRooms">Tải lại phòng</button>
+            </div>
+            <div class="muted" id="roomsLine" style="margin-top:10px">-</div>
+          </div>
+
+          <div class="mini">
+            <h4>Người chơi</h4>
+            <div class="players" id="players"></div>
+          </div>
+
+          <div class="mini">
+            <h4>Chat</h4>
+            <div class="chatBox" id="chatBox"></div>
+            <div class="chatInput">
+              <input id="chatText" type="text" placeholder="Nhập chat..." />
+              <button id="btnSend">Gửi</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<!-- Three.js (CDN) -->
+<script type="module">
+  import * as THREE from "https://unpkg.com/three@0.159.0/build/three.module.js";
+
+  /** ========= Audio (WebAudio) ========= */
+  let audioCtx = null;
+  function beep(freq=440, dur=0.08, type="sine", gain=0.06){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.value = gain;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      o.stop(audioCtx.currentTime + dur);
+    }catch(e){}
+  }
+  function sfxWin(){ beep(523,0.08,"triangle",0.07); setTimeout(()=>beep(659,0.08,"triangle",0.07),80); setTimeout(()=>beep(784,0.10,"triangle",0.07),160); }
+  function sfxLose(){ beep(220,0.10,"sawtooth",0.06); setTimeout(()=>beep(196,0.14,"sawtooth",0.06),110); }
+  function sfxTick(){ beep(880,0.02,"square",0.02); }
+  function sfxRoll(){ beep(330,0.05,"square",0.03); setTimeout(()=>beep(440,0.05,"square",0.03),60); setTimeout(()=>beep(550,0.06,"square",0.03),120); }
+
+  /** ========= 2D fallback dice ========= */
+  function drawDie2D(el, value){
+    el.innerHTML = "";
+    const positions = {
+      tl:[18,18], tc:[33,18], tr:[48,18],
+      ml:[18,33], mc:[33,33], mr:[48,33],
+      bl:[18,48], bc:[33,48], br:[48,48]
+    };
+    const map = {
+      1:["mc"],
+      2:["tl","br"],
+      3:["tl","mc","br"],
+      4:["tl","tr","bl","br"],
+      5:["tl","tr","mc","bl","br"],
+      6:["tl","ml","bl","tr","mr","br"]
+    };
+    const keys = map[value] || [];
+    for(const k of Object.keys(positions)){
+      const p = document.createElement("div");
+      p.className = "pip";
+      const [x,y] = positions[k];
+      p.style.left = (x-6) + "px";
+      p.style.top  = (y-6) + "px";
+      p.style.opacity = keys.includes(k) ? "1" : "0";
+      el.appendChild(p);
+    }
+  }
+  const fallbackBox = document.getElementById("fallback2d");
+  const die2dEls = [document.getElementById("die1"), document.getElementById("die2"), document.getElementById("die3")];
+  die2dEls.forEach(d => drawDie2D(d, 1));
+  function setShake2D(on){
+    die2dEls.forEach(d => d.classList.toggle("shake", on));
+  }
+
+  /** ========= 3D Dice (Three.js) ========= */
+  const canvas = document.getElementById("threeCanvas");
+  let use3D = true;
+  let renderer, scene, camera, dice = [];
+  let rolling = false;
+
+  function makeFaceTexture(n){
+    // simple white face w/ black pips, drawn on canvas
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 256;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#f3f6fb";
+    ctx.fillRect(0,0,256,256);
+    // subtle border
+    ctx.strokeStyle = "rgba(0,0,0,.15)";
+    ctx.lineWidth = 10;
+    ctx.strokeRect(8,8,240,240);
+
+    const pip = (x,y)=>{
+      ctx.beginPath();
+      ctx.fillStyle = "#0f172a";
+      ctx.arc(x,y,18,0,Math.PI*2);
+      ctx.fill();
+    };
+
+    const pos = {
+      tl:[78,78], tr:[178,78],
+      ml:[78,128], mr:[178,128],
+      bl:[78,178], br:[178,178],
+      mc:[128,128]
+    };
+    const map = {
+      1:["mc"],
+      2:["tl","br"],
+      3:["tl","mc","br"],
+      4:["tl","tr","bl","br"],
+      5:["tl","tr","mc","bl","br"],
+      6:["tl","ml","bl","tr","mr","br"]
+    };
+    (map[n]||[]).forEach(k=>pip(pos[k][0],pos[k][1]));
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    return tex;
+  }
+
+  // We’ll define cube face order for BoxGeometry material indices:
+  // [right, left, top, bottom, front, back]
+  // We'll map numbers so that we can rotate to show correct "top" face.
+  // We assign:
+  // top = 1, bottom = 6, front = 2, back = 5, right = 3, left = 4 (classic opposing sums = 7)
+  function makeDieMesh(){
+    const geo = new THREE.BoxGeometry(1,1,1);
+    const mats = [
+      new THREE.MeshStandardMaterial({ map: makeFaceTexture(3) }), // right
+      new THREE.MeshStandardMaterial({ map: makeFaceTexture(4) }), // left
+      new THREE.MeshStandardMaterial({ map: makeFaceTexture(1) }), // top
+      new THREE.MeshStandardMaterial({ map: makeFaceTexture(6) }), // bottom
+      new THREE.MeshStandardMaterial({ map: makeFaceTexture(2) }), // front
+      new THREE.MeshStandardMaterial({ map: makeFaceTexture(5) })  // back
+    ];
+    const mesh = new THREE.Mesh(geo, mats);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  // Desired top face to rotations (approx) given our material mapping above
+  // We'll rotate cube so that the face number becomes "top".
+  // With mapping: top=1 at rest, bottom=6, front=2, back=5, right=3, left=4.
+  function rotationForTop(n){
+    const r = new THREE.Euler(0,0,0);
+    if(n===1) return r;
+    if(n===6) return new THREE.Euler(Math.PI, 0, 0);
+    if(n===2) return new THREE.Euler(-Math.PI/2, 0, 0);
+    if(n===5) return new THREE.Euler(Math.PI/2, 0, 0);
+    if(n===3) return new THREE.Euler(0, 0, -Math.PI/2);
+    if(n===4) return new THREE.Euler(0, 0, Math.PI/2);
+    return r;
+  }
+
+  function init3D(){
+    try{
+      renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+      camera.position.set(0, 2.5, 5.2);
+      camera.lookAt(0,0,0);
+
+      const amb = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(amb);
+      const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+      dir.position.set(3, 6, 4);
+      scene.add(dir);
+
+      // floor (invisible-ish)
+      const floorGeo = new THREE.PlaneGeometry(20,20);
+      const floorMat = new THREE.MeshStandardMaterial({ color: 0x0b1220, transparent:true, opacity:0.15 });
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI/2;
+      floor.position.y = -1.0;
+      scene.add(floor);
+
+      dice = [makeDieMesh(), makeDieMesh(), makeDieMesh()];
+      dice[0].position.set(-1.4, 0, 0);
+      dice[1].position.set(0, 0, 0);
+      dice[2].position.set(1.4, 0, 0);
+      dice.forEach(d=>{
+        d.rotation.set(Math.random()*1, Math.random()*1, Math.random()*1);
+        scene.add(d);
+      });
+
+      function resize(){
+        const rect = canvas.getBoundingClientRect();
+        const w = Math.max(1, Math.floor(rect.width));
+        const h = Math.max(1, Math.floor(rect.height));
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      resize();
+      window.addEventListener("resize", resize);
+
+      const clock = new THREE.Clock();
+      function anim(){
+        requestAnimationFrame(anim);
+        const dt = Math.min(0.05, clock.getDelta());
+        if(rolling){
+          dice.forEach((d, i)=>{
+            d.rotation.x += (3.8 + i)*dt;
+            d.rotation.y += (4.2 + i)*dt;
+            d.rotation.z += (3.1 + i)*dt;
+          });
+        }
+        renderer.render(scene, camera);
+      }
+      anim();
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  use3D = init3D();
+  if(!use3D){
+    canvas.style.display = "none";
+    fallbackBox.style.display = "flex";
+  }
+
+  function setRolling(on){
+    rolling = on;
+    if(!use3D) setShake2D(on);
+  }
+
+  async function settle3DToValues(vals){
+    // smoothly tween rotations to desired top faces
+    if(!use3D){
+      vals.forEach((v, i)=> drawDie2D(die2dEls[i], v));
+      return;
+    }
+    const targets = vals.map(v=> rotationForTop(v));
+    const start = dice.map(d=> d.rotation.clone());
+    const dur = 0.7;
+    const t0 = performance.now();
+
+    function lerpAngle(a,b,t){
+      // shortest path
+      let d = b - a;
+      while(d > Math.PI) d -= Math.PI*2;
+      while(d < -Math.PI) d += Math.PI*2;
+      return a + d * t;
+    }
+
+    return new Promise(resolve=>{
+      function step(now){
+        const t = Math.min(1, (now - t0) / (dur*1000));
+        const ease = t<.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2;
+        dice.forEach((d, i)=>{
+          d.rotation.x = lerpAngle(start[i].x, targets[i].x, ease);
+          d.rotation.y = lerpAngle(start[i].y, targets[i].y, ease);
+          d.rotation.z = lerpAngle(start[i].z, targets[i].z, ease);
+        });
+        if(t < 1) requestAnimationFrame(step);
+        else resolve();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  /** ========= App State ========= */
+  let ws = null;
+  let myId = null;
+  let roomState = null;
+  let currentBets = new Map(); // playerId -> {side,amount}
+
+  function dealerSay(text){
+    document.getElementById("dealerLine").innerText = text;
+  }
+
+  function statsFromHistory(history){
+    const total = history.length;
+    let tai=0, xiu=0;
+    for(const h of history){
+      if(h.side === "TAI") tai++;
+      else if(h.side === "XIU") xiu++;
+    }
+    const pct = (n)=> total ? Math.round(n*100/total) : 0;
+    return { total, tai, xiu, taiPct:pct(tai), xiuPct:pct(xiu) };
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  }
+
+  function formatBet(pid){
+    const b = currentBets.get(pid);
+    if(!b) return "chưa cược";
+    const cls = b.side === "TAI" ? "good" : "gold";
+    return `<span class="${cls}">${b.side}</span> • ${b.amount}`;
+  }
+
+  function renderPlayers(players){
+    const box = document.getElementById("players");
+    box.innerHTML = "";
+    players
+      .slice()
+      .sort((a,b)=>b.balance-a.balance)
+      .forEach(p=>{
+        const row = document.createElement("div");
+        row.className = "playerRow";
+        const left = document.createElement("div");
+        left.innerHTML = `<div style="font-weight:700">${escapeHtml(p.name)} ${p.id===myId?'<span class="tag">(bạn)</span>':""}</div>
+                          <div class="tag">${p.id}</div>`;
+        const right = document.createElement("div");
+        right.innerHTML = `<div class="gold" style="font-weight:800">${p.balance}</div>
+                          <div class="tag">${formatBet(p.id)}</div>`;
+        row.appendChild(left);
+        row.appendChild(right);
+        box.appendChild(row);
+      });
+  }
+
+  function renderHistory(history){
+    const el = document.getElementById("historyLine");
+    if(!history?.length){
+      el.innerText = "Chưa có lịch sử.";
+      return;
+    }
+    el.innerHTML = history.slice(0,12).map(h=>{
+      const cls = h.side==="TAI" ? "good" : "gold";
+      return `<span class="${cls}" style="font-weight:800">${h.side}</span><span class="muted">(${h.sum})</span>`;
+    }).join("  •  ");
+  }
+
+  function renderStats(history){
+    const el = document.getElementById("statsLine");
+    const s = statsFromHistory(history || []);
+    el.innerHTML = `Tổng <b>${s.total}</b> ván • TÀI: <span class="good"><b>${s.tai}</b> (${s.taiPct}%)</span> • XỈU: <span class="gold"><b>${s.xiu}</b> (${s.xiuPct}%)</span>`;
+  }
+
+  function renderLeaderboard(lb){
+    const el = document.getElementById("leaderLine");
+    if(!lb?.length){
+      el.innerText = "Chưa có dữ liệu.";
+      return;
+    }
+    el.innerHTML = "";
+    lb.forEach((x, idx)=>{
+      const row = document.createElement("div");
+      row.className = "leaderRow";
+      const netCls = x.net >= 0 ? "good" : "bad";
+      row.innerHTML = `
+        <div>
+          <b>#${idx+1} ${escapeHtml(x.name)}</b>
+          <div class="tag">Played: ${x.played} • W:${x.wins} / L:${x.losses}</div>
+        </div>
+        <div class="${netCls}" style="font-weight:900;align-self:center">${x.net}</div>
+      `;
+      el.appendChild(row);
+    });
+  }
+
+  function setState(state){
+    document.getElementById("state").innerText = state || "-";
+  }
+  function setCountdown(ms){
+    const sec = Math.max(0, Math.ceil(ms/1000));
+    document.getElementById("countdown").innerText = sec;
+    if(sec <= 5 && roomState?.state === "BETTING") sfxTick();
+  }
+  function updateBalanceFromRoom(){
+    if(!roomState || !myId) return;
+    const me = roomState.players?.find(p=>p.id===myId);
+    document.getElementById("balance").innerText = me ? me.balance : "-";
+  }
+  function updateCommitLine(commit, seed=null){
+    const el = document.getElementById("verifyLine");
+    if(seed){
+      el.innerText = `Commit: ${commit} • Reveal seed: ${seed} (hash SHA-256 để tự kiểm tra)`;
+    }else{
+      el.innerText = `Commit round này: ${commit}`;
+    }
+  }
+
+  /** ========= Chat ========= */
+  function addChatLine(html){
+    const box = document.getElementById("chatBox");
+    const p = document.createElement("div");
+    p.className = "chatLine";
+    p.innerHTML = html;
+    box.appendChild(p);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function renderRoomsList(rooms){
+    const el = document.getElementById("roomsLine");
+    if(!rooms?.length){
+      el.innerText = "Chưa có phòng nào (ngoài phòng bạn tạo).";
+      return;
+    }
+    el.innerHTML = rooms.slice(0, 10).map(r=>{
+      return `<div class="leaderRow" style="align-items:center">
+        <div>
+          <b>${escapeHtml(r.roomId)}</b>
+          <div class="tag">Players: ${r.players} • State: ${r.state} • Round: ${r.roundId}</div>
+        </div>
+        <button class="btnGhost" data-room="${escapeHtml(r.roomId)}">Vào</button>
+      </div>`;
+    }).join("");
+
+    // bind buttons
+    el.querySelectorAll("button[data-room]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        document.getElementById("roomId").value = btn.getAttribute("data-room");
+        connect(true);
+      });
+    });
+  }
+
+  async function refreshRoomsHTTP(){
+    try{
+      const r = await fetch("/api/rooms");
+      const j = await r.json();
+      renderRoomsList(j.rooms || []);
+    }catch{
+      // ignore
+    }
+  }
+
+  /** ========= WebSocket ========= */
+  function connect(force=false){
+    if(ws && !force && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+    const roomId = document.getElementById("roomId").value.trim() || "lobby";
+    const name = document.getElementById("name").value.trim() || "Player";
+
+    try { ws?.close(); } catch {}
+    ws = new WebSocket(`ws://${location.host}`);
+    dealerSay("Đang kết nối...");
+
+    ws.addEventListener("open", ()=>{
+      ws.send(JSON.stringify({ type:"JOIN", roomId, name }));
+      ws.send(JSON.stringify({ type:"LIST_ROOMS" }));
+      refreshRoomsHTTP();
+    });
+
+    ws.addEventListener("message", async (ev)=>{
+      const msg = JSON.parse(ev.data);
+
+      if(msg.type === "ROOMS"){
+        renderRoomsList(msg.payload.rooms || []);
+        return;
+      }
+
+      if(msg.type === "WELCOME"){
+        myId = msg.payload.playerId;
+        addChatLine(`<span class="sys">Hệ thống:</span> Bạn đã vào phòng. ID: <span class="muted">${myId}</span>`);
+        dealerSay("Chào bạn! Đặt cược đi nào 😎");
+        return;
+      }
+
+      if(msg.type === "ROOM"){
+        roomState = msg.payload;
+        document.getElementById("roundId").innerText = roomState.roundId ?? "-";
+        setState(roomState.state);
+        setCountdown(roomState.countdownMs ?? 0);
+
+        currentBets.clear();
+        (roomState.bets || []).forEach(b=> currentBets.set(b.playerId, {side:b.side, amount:b.amount}));
+
+        renderPlayers(roomState.players || []);
+        updateBalanceFromRoom();
+        renderStats(roomState.history || []);
+        renderHistory(roomState.history || []);
+        renderLeaderboard(roomState.leaderboard || []);
+        updateCommitLine(roomState.commit);
+
+        return;
+      }
+
+      if(msg.type === "COUNTDOWN"){
+        setCountdown(msg.payload.remainMs);
+        return;
+      }
+
+      if(msg.type === "STATE"){
+        setState(msg.payload.state);
+        if(msg.payload.state === "ROLLING"){
+          dealerSay("Đang lăn xúc xắc 3D...");
+          setRolling(true);
+          sfxRoll();
+        }
+        return;
+      }
+
+      if(msg.type === "RESULT"){
+        setRolling(false);
+
+        const r = msg.payload;
+
+        // stop & settle dice to final faces (top faces)
+        // NOTE: For demo we display each die's value as "top".
+        await settle3DToValues(r.dice);
+
+        document.getElementById("resultBig").innerHTML =
+          `Kết quả: <span class="${r.side==="TAI"?"good":"gold"}">${r.side}</span> • Tổng: <b>${r.sum}</b>`;
+
+        updateCommitLine(r.commit, r.revealedServerSeed);
+
+        const myBet = currentBets.get(myId);
+        if(myBet){
+          if(myBet.side === r.side){
+            dealerSay("Bạn thắng rồi! 💸");
+            sfxWin();
+          }else{
+            dealerSay("Chưa may mắn — ván sau gỡ! 🎯");
+            sfxLose();
+          }
+        }else{
+          dealerSay("Bạn không cược ván này.");
+        }
+        return;
+      }
+
+      if(msg.type === "CHAT"){
+        const p = msg.payload;
+        if(p.system){
+          addChatLine(`<span class="sys">Hệ thống:</span> ${escapeHtml(p.text)}`);
+        }else{
+          addChatLine(`<b>${escapeHtml(p.from)}:</b> ${escapeHtml(p.text)}`);
+        }
+        return;
+      }
+
+      if(msg.type === "ERR"){
+        dealerSay(msg.payload.message || "Có lỗi.");
+        addChatLine(`<span class="sys">Lỗi:</span> ${escapeHtml(msg.payload.message || "Không rõ")}`);
+        return;
+      }
+    });
+
+    ws.addEventListener("close", ()=>{
+      dealerSay("Mất kết nối. Bấm “Vào phòng” để kết nối lại.");
+    });
+  }
+
+  function sendBet(side){
+    if(!ws || ws.readyState !== WebSocket.OPEN) return dealerSay("Chưa kết nối.");
+    const amount = Number(document.getElementById("betAmount").value);
+    ws.send(JSON.stringify({ type:"BET", side, amount }));
+  }
+
+  function sendChat(){
+    if(!ws || ws.readyState !== WebSocket.OPEN) return;
+    const input = document.getElementById("chatText");
+    const text = input.value.trim();
+    if(!text) return;
+    ws.send(JSON.stringify({ type:"CHAT", text }));
+    input.value = "";
+  }
+
+  /** ========= Buttons ========= */
+  document.getElementById("btnJoin").addEventListener("click", ()=>connect(true));
+  document.getElementById("btnTai").addEventListener("click", ()=>sendBet("TAI"));
+  document.getElementById("btnXiu").addEventListener("click", ()=>sendBet("XIU"));
+
+  document.getElementById("btnClear").addEventListener("click", ()=>{
+    document.getElementById("betAmount").value = 100;
+    dealerSay("Muốn đổi cược thì đặt lại (server sẽ ghi đè).");
+  });
+
+  document.getElementById("btnReset").addEventListener("click", ()=>{
+    if(!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type:"RESET_BALANCE" }));
+    dealerSay("Đã reset coin về 1000.");
+  });
+
+  document.getElementById("btnSend").addEventListener("click", sendChat);
+  document.getElementById("chatText").addEventListener("keydown", (e)=>{
+    if(e.key === "Enter") sendChat();
+  });
+
+  document.getElementById("btnRefreshRooms").addEventListener("click", ()=>{
+    refreshRoomsHTTP();
+    if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type:"LIST_ROOMS" }));
+  });
+
+  document.addEventListener("keydown", (e)=>{
+    if(e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+    if(e.key.toLowerCase() === "t") sendBet("TAI");
+    if(e.key.toLowerCase() === "x") sendBet("XIU");
+  });
+
+  /** auto connect once + load rooms */
+  refreshRoomsHTTP();
+  connect(false);
+</script>
+</body>
+</html>
